@@ -1,2 +1,2 @@
-# rmsspec
-Code for making rms spectrum
+# LAT
+Lightcurve Analysis Tool
