@@ -1,24 +1,9 @@
 import numpy as np
 # import pandas as pd
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from scipy import signal
 
-
-def lcsplit(lcdata, dt, min_gap=0, min_points=1):
-    '''
-    '''
-    # search for irregular interval
-    diff = np.round(np.diff(lcdata[:, 0]), 6)
-    idxs_split = np.array(np.where(diff != dt)) + 1
-    # print(f'Number of segment: {idxs_split.shape[1]}')
-
-    # add 0 and -1 to idxs_split
-    idxs_split = np.insert(idxs_split, 0, 0)
-    idxs_split = np.append(idxs_split, len(lcdata)-1)
-
-    # generate split lightcurves
-    for k in range(len(idxs_split)-1):
-        yield lcdata[idxs_split[k]:idxs_split[k+1]]
+from .basic import lcsplit
 
 
 # Cross-correlation function
@@ -26,12 +11,14 @@ def ccf(x, y, fs=1, maxlags=None):
 
     # calcurate correlation and lags
     n_x, n_y = len(x), len(y)
-    r = signal.correlate(y, x, mode='full')
-    r = r / (np.sqrt(n_x)*np.std(x)) / (np.sqrt(n_y)*np.std(y))
+    T = max(n_x, n_y)
+    x_cent = x - np.mean(x)
+    y_cent = y - np.mean(y)
+    r = signal.correlate(y_cent, x_cent, mode='full')
+    r = r / np.std(x) / np.std(y) / T
     lags = np.arange(-n_x + 1, n_y) / fs
 
     # query
-    T = max(n_x, n_y)
     maxlags = 2 * T - 1 if maxlags is None else maxlags
     lag_out = lags[((-maxlags <= lags) & (lags <= maxlags))]
     r_out = r[((-maxlags <= lags) & (lags <= maxlags))]
@@ -39,14 +26,96 @@ def ccf(x, y, fs=1, maxlags=None):
     return lag_out, r_out
 
 
-def stackccf(lcdata1, lcdata2, dt, maxlags, output='ave'):
+def dcf(X1, X2, dt=1, maxlags=20):
+
+    # calcurate basic values
+    f1 = X1[:, 1] - np.mean(X1[:, 1])
+    f2 = X2[:, 1] - np.mean(X2[:, 1])
+    sg1 = np.std(X1[:, 1])
+    sg2 = np.std(X2[:, 1])
+    er1 = np.mean(X1[:, 2])
+    er2 = np.mean(X2[:, 2])
+
+    # time difference matrix
+    tt1, tt2 = np.meshgrid(X1[:, 0], X2[:, 0])
+    tdelta_mat = tt1 - tt2
+
+    # calcurate udcf
+    f1 = np.reshape(f1, (len(f1), 1))
+    f2 = np.reshape(f2, (1, len(f2)))
+    udcf = np.dot(f1, f2)/np.sqrt((sg1**2-er1**2)*(sg2**2-er2**2))
+
+    # calcurate correlations
+    lags = np.arange(-maxlags-dt, maxlags+dt+dt, dt)
+    corrs = np.zeros(len(lags)-1)
+    ns = np.zeros(len(lags)-1)
+    place = np.array([np.searchsorted(lags, tdelta)
+                      for tdelta in tdelta_mat])
+    for i in range(len(lags)-1):
+        bools = np.where(place == i)
+        corrs[i] = np.sum(udcf[bools])
+        ns[i] = np.sum(bools)
+    corrs = corrs/ns
+
+    # calcurate errors
+    errs = np.zeros(len(lags)-1)
+    for i in range(len(lags)-1):
+        bools = np.where(place == i)
+        errs[i] = np.sqrt(np.sum((udcf[bools] - corrs[i])**2))
+    errs = errs/(ns-1)
+
+    # delete head and tail because these are
+    # out of lag range
+    lags, corrs, errs = lags[1:-1], corrs[1:-1], errs[1:-1]
+
+    return lags, corrs, errs
+
+
+def sccf(lcdata1, lcdata2, dt, maxlags,
+         min_gap=0, min_points=1, output='ave'):
+
+    # split lightcurves
+    lcs1 = lcsplit(lcdata1, dt, min_gap, min_points)
+    lcs2 = lcsplit(lcdata2, dt, min_gap, min_points)
 
     # ccf calulation
     r_tile = []
-    for i, (l1, l2) in enumerate(lcsplit(lcdata1, lcdata2, dt, maxlags)):
+    for i, (l1, l2) in enumerate(zip(lcs1, lcs2)):
         if len(l1) > maxlags/dt:
             lag, r = ccf(l1[:, 1], l2[:, 1], 1/dt, maxlags)
             r_tile.append(r)
+
+    # rate check
+    r_tile = np.array(r_tile)
+    if (r_tile.shape[0]-1) / i < 0.5:
+        print(f'!!! Accept rate is below 50 %: {r_tile.shape[0]-1} / {i}')
+        # print(f'number of accepted segment: {r_tile.shape[0]-1} / {i}')
+
+    # output arrangemt
+    if output == 'ave':
+        r_ave = np.average(r_tile, 0)
+        return lag, r_ave
+    elif output == 'tile':
+        return lag, r_tile
+
+
+def sym_sccf(lcdata1, lcdata2, dt, maxlags,
+             min_gap=0, min_points=1,
+             base_side='left', output='ave'):
+
+    # split lightcurves
+    lcs1 = lcsplit(lcdata1, dt, min_gap, min_points)
+    lcs2 = lcsplit(lcdata2, dt, min_gap, min_points)
+
+    # ccf calulation
+    r_tile = []
+    for i, (l1, l2) in enumerate(zip(lcs1, lcs2)):
+        if len(l1) > maxlags/dt:
+            lag, r = ccf(l1[:, 1], l2[:, 1], 1/dt, maxlags)
+            r = symccf(r, base_side)
+            r_tile.append(r)
+
+    # rate check
     r_tile = np.array(r_tile)
     if (r_tile.shape[0]-1) / i < 0.5:
         print(f'!!! Accept rate is below 50 %: {r_tile.shape[0]-1} / {i}')
@@ -75,10 +144,7 @@ def symccf(a, base_side='left'):
     # substraction
     corr_rest = a - corr_sym
 
-    # arrangement
-    out = corr_rest if base_side == 'left' else corr_rest[::-1]
-
-    return out
+    return corr_rest
 
 
 def main():
@@ -94,12 +160,7 @@ def main():
 
     lcdata1 = np.array([time, flux1]).T
     lcdata2 = np.array([time, flux2]).T
-
-    # lcsplit
-    lag, rs = stackccf(lcdata1, lcdata2, 1, 10, 'tile')
-    for r in rs:
-        plt.plot(lag, r)
-    plt.show()
+    print(lcdata1, lcdata2)
 
 
 if __name__ == '__main__':
