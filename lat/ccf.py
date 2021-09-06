@@ -35,6 +35,7 @@ def dcf(X1, X2, dt=1, maxlags=20):
     sg2 = np.std(X2[:, 1])
     er1 = np.mean(X1[:, 2])
     er2 = np.mean(X2[:, 2])
+    div = np.sqrt((sg1**2-er1**2)*(sg2**2-er2**2))
 
     # time difference matrix
     tt1, tt2 = np.meshgrid(X1[:, 0], X2[:, 0])
@@ -43,26 +44,21 @@ def dcf(X1, X2, dt=1, maxlags=20):
     # calcurate udcf
     f1 = np.reshape(f1, (len(f1), 1))
     f2 = np.reshape(f2, (1, len(f2)))
-    udcf = np.dot(f1, f2)/np.sqrt((sg1**2-er1**2)*(sg2**2-er2**2))
+    udcf = np.dot(f1, f2)/div
 
     # calcurate correlations
     lags = np.arange(-maxlags-dt, maxlags+dt+dt, dt)
     corrs = np.zeros(len(lags)-1)
+    errs = np.zeros(len(lags)-1)
     ns = np.zeros(len(lags)-1)
     place = np.array([np.searchsorted(lags, tdelta)
                       for tdelta in tdelta_mat])
     for i in range(len(lags)-1):
         bools = np.where(place == i)
-        corrs[i] = np.sum(udcf[bools])
+        m = np.sum(bools)
+        corrs[i] = np.sum(udcf[bools])/np.sum(bools)
+        errs[i] = np.sqrt(np.sum((udcf[bools] - corrs[i])**2))/(m-1)
         ns[i] = np.sum(bools)
-    corrs = corrs/ns
-
-    # calcurate errors
-    errs = np.zeros(len(lags)-1)
-    for i in range(len(lags)-1):
-        bools = np.where(place == i)
-        errs[i] = np.sqrt(np.sum((udcf[bools] - corrs[i])**2))
-    errs = errs/(ns-1)
 
     # delete head and tail because these are
     # out of lag range
