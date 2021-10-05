@@ -20,3 +20,18 @@ def make_gti(time, dt=1, min_points=1):
             gtis.append([time_chunk[0], time_chunk[-1]])
 
     return np.array(gtis)
+
+    def apply_gtis(a, gtis):
+
+        # make mask
+        mask = np.zeros(a.shape)
+        for gti in gtis:
+            m = np.ones(a.shape)
+            m = np.where(((gti[0] <= a) & (a <= gti[1])), m, 0)
+            mask += m
+
+        # apply mask
+        mask = mask.astype(bool)
+        aa = a[mask]
+
+        return aa
