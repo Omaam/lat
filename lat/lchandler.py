@@ -1,3 +1,5 @@
+"""A library for light curve  handling.
+"""
 import numpy as np
 
 __all__ = ["divide_into_segment", "lcsplit"]
