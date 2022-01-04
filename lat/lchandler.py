@@ -1,19 +1,15 @@
 import numpy as np
 
+__all__ = ["divide_into_segment", "lcsplit"]
 
-def set_module(module):
-    """Decorator for overriding __module__ on a function or class.
-    Example usage::
-        @set_module('numpy')
-        def example():
-            pass
-        assert example.__module__ == 'numpy'
-    """
-    def decorator(func):
-        if module is not None:
-            func.__module__ = module
-        return func
-    return decorator
+
+def divide_into_segment(x, nperseg, noverlap):
+    step = nperseg - noverlap
+    shape = x.shape[:-1]+((x.shape[-1]-noverlap)//step, nperseg)
+    strides = x.strides[:-1]+(step*x.strides[-1], x.strides[-1])
+    divided_ary = np.lib.stride_tricks.as_strided(x, shape=shape,
+                                                  strides=strides)
+    return divided_ary
 
 
 def lcsplit(lcdata, dt, min_points=1, min_gap=None):
@@ -38,7 +34,3 @@ def lcsplit(lcdata, dt, min_points=1, min_gap=None):
         lcdata_splited = lcdata[idxs_split[k]:idxs_split[k+1]]
         if min_points <= len(lcdata_splited):
             yield lcdata[idxs_split[k]:idxs_split[k+1]]
-
-
-def moving_average(a, n_ave):
-    return np.convolve(a, np.ones(n_ave), 'valid') / n_ave
