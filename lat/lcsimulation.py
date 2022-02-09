@@ -103,8 +103,8 @@ class LCSimulation():
 
         self.lc_counter = 0
         self.lag_abs_max = None
-        self.lc_blueprint = pd.DataFame()
-        self.ou_blueprint = pd.DataFame()
+        self.lc_blueprint = pd.DataFrame()
+        self.ou_blueprint = pd.DataFrame()
         self.error_list = []
 
     def acquire_time(self, time_start: float = 0.0, dt: float = 0.0):
