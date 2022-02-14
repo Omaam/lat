@@ -6,12 +6,51 @@ import numpy as np
 import pandas as pd
 
 
-def _calculate_convfunc():
-    pass
+def _add_ouprocess_to_df(num_sample_lc: int,
+                         df_ou: pd.DataFrame,
+                         df_lc: pd.DataFrame):
+    """Add OU process samples to pandas.DataFrame.
+    """
+
+    df_ou = _parse_df_lc(df_ou, df_lc)
+
+    curves = []
+    for ou_info in df_ou.itertuples():
+
+        interval_min_max = ou_info.max_lag - ou_info.min_lag
+        num_sample_ou = num_sample_lc + interval_min_max
+        curve = _sample_ouprocess(num_sample_ou,
+                                  ou_info.variance,
+                                  ou_info.lengthscale,
+                                  ou_info.random_state)
+        curves.append(curve)
+
+    df_ou["curve"] = curves
+    logging.debug("df_ou:\n%s", df_ou)
+
+    return df_ou
 
 
-def _convolute():
-    pass
+def _create_lcmatrix(num_sample_lc: int, df_ou: pd.DataFrame,
+                     df_lc: pd.DataFrame):
+    """Create curve matrix from blueprint for light curves.
+    """
+
+    df_lc = df_lc.sort_values("lc_id", ignore_index=True)
+    logging.debug("df_lc:\n%s", df_lc)
+
+    lc_matrix = []
+    for lcinfo in df_lc.values:
+
+        lc_id, ou_id, lag = lcinfo
+        ou_info = df_ou.iloc[ou_id]
+
+        shift = -lag + ou_info.max_lag
+        lc = ou_info.curve[shift:shift+num_sample_lc]
+        lc_matrix.append(lc)
+
+    lc_matrix = np.array(lc_matrix)
+    return lc_matrix
 
 
 def _sample_ouprocess(num_sample: int,
@@ -31,49 +70,31 @@ def _sample_ouprocess(num_sample: int,
     logging.debug("mean: %s", mean.shape)
     logging.debug("cov: %s", cov.shape)
 
+    # Make random_state be int or None.
+    if isinstance(random_state, float):
+        random_state = None
+
     np.random.seed(random_state)
     y = np.random.multivariate_normal(mean, cov)
 
     return y
 
 
-def _create_lagged_curves(num_sample_lc: int,
-                          lag: float,
-                          time_start: float,
-                          dt: float,
-                          amplitude_variance: float,
-                          time_scale: float,
-                          random_state=None):
+def _parse_df_lc(df_ou, df_lc):
 
-    abs_lag = abs(lag)
+    df_ou = df_ou.copy()
+    df_ou["min_lag"] = df_lc.groupby("ou_id").min().lag
+    df_ou["max_lag"] = df_lc.groupby("ou_id").max().lag
 
-    # Calcurate times and coutns.
-    time_stop = dt * (num_sample_lc)
-    times = np.arange(time_start, time_stop, dt)
-    logging.debug("times: %s", times.shape)
+    # Make min_lag be lesser than zero.
+    df_ou["min_lag"] = np.where(df_ou["min_lag"] > 0,
+                                0, df_ou["min_lag"])
+    df_ou["max_lag"] = np.where(df_ou["max_lag"] < 0,
+                                0, df_ou["max_lag"])
 
-    num_sample_lag = int(np.ceil(abs_lag / dt))
-    num_sample_total = num_sample_lc + num_sample_lag
+    logging.debug("df_ou:\n%s", df_ou)
 
-    lenghscale = time_scale / dt if time_scale else None
-    cts = _sample_ouprocess(num_sample_total,
-                            variance=amplitude_variance,
-                            lengthscale=lenghscale)
-
-    # Create lagged curves.
-    if num_sample_lag >= 0:
-        cts1 = cts[num_sample_lag:num_sample_lc+num_sample_lag]
-        cts2 = cts[0:num_sample_lc]
-    elif num_sample_lag < 0:
-        cts1 = cts[0:num_sample_lc]
-        cts2 = cts[num_sample_lag:num_sample_lc+num_sample_lag]
-
-    lc1 = np.vstack([times, cts1]).T
-    lc2 = np.vstack([times, cts2]).T
-    logging.debug("lc1: %s", lc1.shape)
-    logging.debug("lc2: %s", lc2.shape)
-
-    return lc1, lc2
+    return df_ou
 
 
 class LCSimulation():
@@ -92,53 +113,30 @@ class LCSimulation():
           light curve used in blending light curves.
     """
 
-    def __init__(self, lag: float, dt: float):
-
-        self.dt = dt
-        self.lag = lag
-
-        self.time = None
-        self.lc1 = None
-        self.lc2 = None
-
+    def __init__(self):
         self.lc_counter = 0
-        self.lag_abs_max = None
-        self.lc_blueprint = pd.DataFrame()
-        self.ou_blueprint = pd.DataFrame()
-        self.error_list = []
+        self.df_lc = pd.DataFrame(columns=["lc_id", "ou_id", "lag"])
+        self.df_ou = pd.DataFrame(
+            columns=["ou_id", "variance", "lengthscale",
+                     "random_state"])
 
-    def acquire_time(self, time_start: float = 0.0, dt: float = 0.0):
+    def acquire_time(self, num_sample_lc: int,
+                     time_start: float = 0.0, dt: float = 0.0):
         pass
 
-    def add_curve_lagging(self, ou_id: int, lag: int):
-
-        if self.lag_abs_max < abs(lag):
-            self.lag_abs_max = abs(lag)
-
-        self.lc_counter += 1
-        lc_info = {"lc_id": self.lc_counter,
-                   "ou_id": ou_id,
-                   "lag":   0}
-        self.lc_blueprint.append(lc_info, index_ignore=True)
-
-    def add_curve_ouprocess(self, variance: float, lengthscale: int):
-        """Add OU process infomation.
+    def add_oucurve(self, ou_id,
+                    variance: float = 1.0,
+                    lengthscale: float = None,
+                    random_state: int = None):
+        """Add OU process information to dataframe.
         """
-
-        ou_id = len(self.ou_info)
-
         ou_info = {
             "ou_id": ou_id,
             "variance": variance,
-            "lengthscale": lengthscale
+            "lengthscale": lengthscale,
+            "random_state": random_state
         }
-        self.ou_blueprint.append(ou_info, index_ignore=True)
-
-        self.lc_counter += 1
-        lc_info = {"lc_id": self.lc_counter,
-                   "ou_id": ou_id,
-                   "lag":   0}
-        self.lc_blueprint.append(lc_info, ignore_index=True)
+        self.df_ou = self.df_ou.append(ou_info, ignore_index=True)
 
     def add_error_gaussian(self, target_lc_indices: list,
                            mean: float = 0.0, variance: float = 0.1):
@@ -146,10 +144,12 @@ class LCSimulation():
         """
         self.error_list.append([mean, variance])
 
-    def blend_lightcurves(self, design_matrix: np.array):
+    def blend_curves(self, target_lc_ids: list,
+                     design_matrix: list):
         """Blend two light cruves.
 
         Args:
+            * target_lc_ids:
             * design_matrix:
                 [(Number of obsevation) x 2]
                 Matrix of ratios used when blending light curves.
@@ -157,76 +157,29 @@ class LCSimulation():
             * time: Time for blended light cruves.
             * lcs_blended: Blended light curves.
         """
-        # TODO: (Omama) Adapt this to new API.
-        if (self.lc1 is None) & (self.lc2 is None):
-            raise AttributeError(
-                "You must sample curves before blending.")
+        lcmatrix = None
+        return lcmatrix
 
-        design_matrix = np.array(design_matrix)
+    def extract_curve(self, ou_id: int, lag: int):
 
-        cts_matrix_original = np.array([self.lc1[:, 1], self.lc2[:, 1]])
-        cts_matrix_blended = np.dot(design_matrix, cts_matrix_original)
+        lc_info = {"lc_id": self.lc_counter,
+                   "ou_id": ou_id,
+                   "lag":   lag}
+        self.df_lc = self.df_lc.append(lc_info, ignore_index=True)
+        self.lc_counter += 1
 
-        return self.time, cts_matrix_blended
-
-    def sample(self, num_point: int, random_state: int = None):
+    def sample(self, num_sample_lc: int, random_state: int = None):
         """Sample curves using added information.
         """
-
-        if self.lc_blueprint == []:
+        if len(self.df_lc) == 0:
             raise ValueError(
                 "You must add curve(s) before sampling.")
 
-        # Sample OU process.
-        num_point_total = num_point + self.lag_abs_max
-        ys = []
-        for i, ou_info in enumerate(self.ou_blueprint):
+        self.df_ou = _add_ouprocess_to_df(num_sample_lc,
+                                          self.df_ou,
+                                          self.df_lc)
+        lcmatrix = _create_lcmatrix(num_sample_lc, self.df_ou,
+                                    self.df_lc)
+        self.lcmatrix = lcmatrix
 
-            # To avoid sampling the same curve.
-            if random_state is not None:
-                random_state = random_state + i
-
-            y = _sample_ouprocess(num_point_total,
-                                  ou_info["variance"],
-                                  ou_info["lengthscale"],
-                                  random_state=random_state)
-            ys.append(y)
-        self.ou_blueprint["curve"] = ys
-
-        # Convolute to get lagging curve.
-        # TODO: (Omama) Complete below.
-        lags_list = self.lc_blueprint["lag"]
-        conv_funcs = _calculate_convfunc(num_point_total, lags_list)
-
-        lc_list = []
-        for ou in self.ou_blueprintp["curve"]:
-            for conv_func in conv_funcs:
-                lc = _convolute(ou, conv_func)
-                lc_list.append(lc)
-
-        return lc_list
-
-    # TODO: (Omama) Following function is old one. Check dependencies
-    #       and delete.
-    def sample_curves(self, num_sample: int,
-                      time_start: float = 0.0,
-                      amplitude_variance: float = 1.0,
-                      time_scale: float = None,
-                      random_state: int = None):
-        """Sample lagged light curves.
-        """
-
-        lc1, lc2 = _create_lagged_curves(
-            num_sample_lc=num_sample,
-            lag=self.lag,
-            time_start=time_start,
-            dt=self.dt,
-            amplitude_variance=amplitude_variance,
-            time_scale=time_scale,
-            random_state=random_state)
-
-        self.time = lc1[:, 0]
-        self.lc1 = lc1
-        self.lc2 = lc2
-
-        return lc1, lc2
+        return lcmatrix
