@@ -189,7 +189,7 @@ def ccf_error(x, y, fs=1.0, nperseg=256, noverlap=None,
 
 def main():
 
-    np.random.seed(20210609)
+    np.random.seed(20210612)
 
     npoints = 10000
     lag = 5

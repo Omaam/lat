@@ -1,4 +1,6 @@
 """Input and output handler for astronomical data.
+
+This module handles fits and qdp files.
 """
 import numpy as np
 import pandas as pd
@@ -20,3 +22,17 @@ def load_qdpfile(qdp_name, columns=None):
         df_tot.columns = columns
 
     return df_tot
+
+
+def event_file(event_name):
+    """Input event file and output dataframe.
+    """
+    df_event = None
+    return df_event
+
+
+def lc_file(lc_name):
+    """Input light curve and output dataframe.
+    """
+    df_lc = None
+    return df_lc

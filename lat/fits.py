@@ -1,3 +1,7 @@
+"""
+TODO:
+    *Make Event class for event file.
+"""
 import numpy as np
 # import pandas as pd
 # import matplotlib.pyplot as plt
@@ -36,3 +40,16 @@ def apply_gtis(a, gtis):
     aa = a[mask]
 
     return aa
+
+
+class Event():
+
+    def __init__(self, event_file):
+        self.event = None
+        pass
+
+    def extract(self, condition):
+        pass
+
+    def remove(self, condition):
+        pass
