@@ -5,6 +5,7 @@ TODO:
       light curves are unevened.(2021-12-20 17:16:50)
 
 """
+import warnings
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,6 +17,11 @@ import lat.lchandler as lchandler
 
 __all__ = ["ccf", "dcf", "sccf", "sym_sccf",
            "subtract_oneside", "ccf_error"]
+
+warnings.warn(
+     "ccf is deprecated. You should "
+     "use 'correlation' module instead."
+)
 
 
 def _correlation_function(x, y):

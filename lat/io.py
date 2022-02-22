@@ -2,8 +2,24 @@
 
 This module handles fits and qdp files.
 """
+from astropy.table import Table
 import numpy as np
 import pandas as pd
+
+
+def load_eventfile(event_name):
+    """Input event file and output dataframe.
+    """
+    df_event = None
+    return df_event
+
+
+def load_lcfile(lcname):
+    """Input light curve and output dataframe.
+    """
+    tbl = Table.read(lcname, format="fits", hdu=1)
+    df_lc = tbl.to_pandas()
+    return df_lc
 
 
 def load_qdpfile(qdp_name, columns=None):
@@ -22,17 +38,3 @@ def load_qdpfile(qdp_name, columns=None):
         df_tot.columns = columns
 
     return df_tot
-
-
-def event_file(event_name):
-    """Input event file and output dataframe.
-    """
-    df_event = None
-    return df_event
-
-
-def lc_file(lc_name):
-    """Input light curve and output dataframe.
-    """
-    df_lc = None
-    return df_lc

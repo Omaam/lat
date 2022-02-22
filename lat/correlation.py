@@ -1,4 +1,4 @@
-"""There are some kind of CCF.
+"""This module handles correlation functions.
 
 TODO:
     * Make function that is able to calcurate CCF, even if
@@ -99,6 +99,27 @@ def dcf(X1, X2, dt=1, maxlags=20):
     lags, corrs, errs = lags[1:-1], corrs[1:-1], errs[1:-1]
 
     return lags, corrs, errs
+
+
+def sacf(lcdata, dt, maxlags,
+         min_gap=0, min_points=1, output='ave'):
+
+    # split lightcurves
+    lcs = lcsplit(lcdata, dt, min_gap, min_points)
+
+    r_tile = []
+    for i, lc in enumerate(lcs):
+        if len(lc) > maxlags/dt:
+            lag, r = acf(lc[:, 1], 1/dt, maxlags)
+            r_tile.append(r)
+    r_tile = np.array(r_tile)
+
+    # output arrangemt
+    if output == 'ave':
+        r_ave = np.average(r_tile, 0)
+        return lag, r_ave
+    elif output == 'tile':
+        return lag, r_tile
 
 
 def sccf(lcdata1, lcdata2, dt, maxlags,
