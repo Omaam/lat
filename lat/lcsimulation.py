@@ -49,7 +49,7 @@ def _create_lcmatrix(num_sample_lc: int, df_ou: pd.DataFrame,
         lc = ou_info.curve[shift:shift+num_sample_lc]
         lc_matrix.append(lc)
 
-    lc_matrix = np.array(lc_matrix)
+    lc_matrix = np.array(lc_matrix).T
     return lc_matrix
 
 
@@ -60,19 +60,16 @@ def _sample_ouprocess(num_sample: int,
 
     x = np.arange(0, num_sample, 1)
     x = x[:, np.newaxis]
-    logging.debug("x: %s", x.shape)
 
     kernel = gpy.kern.Exponential(input_dim=1,
                                   variance=variance,
                                   lengthscale=lengthscale)
     mean = np.zeros(num_sample)
     cov = kernel.K(x, x)
-    logging.debug("mean: %s", mean.shape)
-    logging.debug("cov: %s", cov.shape)
 
     # Make random_state be int or None.
     if isinstance(random_state, float):
-        random_state = None
+        random_state = int(random_state)
 
     np.random.seed(random_state)
     y = np.random.multivariate_normal(mean, cov)
@@ -95,6 +92,27 @@ def _parse_df_lc(df_ou, df_lc):
     logging.debug("df_ou:\n%s", df_ou)
 
     return df_ou
+
+
+def blend_curves(lc_matrix: list,
+                 design_matrix: list):
+    """Blend two light cruves.
+
+    Args:
+        * target_lc_ids:
+        * design_matrix:
+            [(Number of obsevation) x 2]
+            Matrix of ratios used when blending light curves.
+    Return:
+        * time: Time for blended light cruves.
+        * lcs_blended: Blended light curves.
+    """
+    lc_matrix = np.array(lc_matrix)
+    design_matrix = np.array(design_matrix)
+
+    blended_lc = np.dot(lc_matrix, design_matrix)
+
+    return blended_lc
 
 
 class LCSimulation():
@@ -144,22 +162,6 @@ class LCSimulation():
         """
         self.error_list.append([mean, variance])
 
-    def blend_curves(self, target_lc_ids: list,
-                     design_matrix: list):
-        """Blend two light cruves.
-
-        Args:
-            * target_lc_ids:
-            * design_matrix:
-                [(Number of obsevation) x 2]
-                Matrix of ratios used when blending light curves.
-        Return:
-            * time: Time for blended light cruves.
-            * lcs_blended: Blended light curves.
-        """
-        lcmatrix = None
-        return lcmatrix
-
     def extract_curve(self, ou_id: int, lag: int):
 
         lc_info = {"lc_id": self.lc_counter,
@@ -168,7 +170,7 @@ class LCSimulation():
         self.df_lc = self.df_lc.append(lc_info, ignore_index=True)
         self.lc_counter += 1
 
-    def sample(self, num_sample_lc: int, random_state: int = None):
+    def sample(self, num_sample_lc: int):
         """Sample curves using added information.
         """
         if len(self.df_lc) == 0:
