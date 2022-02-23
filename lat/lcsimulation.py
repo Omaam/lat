@@ -68,8 +68,8 @@ def _sample_ouprocess(num_sample: int,
     cov = kernel.K(x, x)
 
     # Make random_state be int or None.
-    if isinstance(random_state, float):
-        random_state = int(random_state)
+    if np.isnan(random_state):
+        random_state = None
 
     np.random.seed(random_state)
     y = np.random.multivariate_normal(mean, cov)
@@ -138,6 +138,8 @@ class LCSimulation():
             columns=["ou_id", "variance", "lengthscale",
                      "random_state"])
 
+        self.lcmatrix = None
+
     def acquire_time(self, num_sample_lc: int,
                      time_start: float = 0.0, dt: float = 0.0):
         pass
@@ -161,6 +163,23 @@ class LCSimulation():
         """ Add error information.
         """
         self.error_list.append([mean, variance])
+
+    def blend_curves(self, ids_target_curve: list, design_vector: list):
+        """Blend curves using pre-sampled curves.
+        """
+        if self.lcmatrix is None:
+            raise AttributeError(
+                "self.lcmatrix doesn't exist. You must run "
+                "'sample' method beforehand."
+            )
+
+        design_vector = np.array(design_vector)
+        design_vector = design_vector[:, np.newaxis]
+
+        lcmatrix_target = self.lcmatrix[:, ids_target_curve]
+        lcmatrix_blended = np.dot(lcmatrix_target, design_vector)
+
+        return lcmatrix_blended
 
     def extract_curve(self, ou_id: int, lag: int):
 
