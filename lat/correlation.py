@@ -5,6 +5,7 @@ TODO:
       light curves are unevened.(2021-12-20 17:16:50)
 
 """
+from typing import List
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -48,6 +49,49 @@ def acf(x, fs=1, maxlags=None):
     is_in_range = _get_lagrange(lags, maxlength, maxlags)
 
     return lags[is_in_range], r[is_in_range]
+
+
+def calc_stackccf(
+        X1: np.ndarray, X2: np.ndarray,
+        maxlags: int, dt: float,
+        slide_ratio: float = 0.5) -> List[np.ndarray]:
+    """Calculate stacked cross-correlation function.
+    """
+    nperseg = int((2*maxlags)/dt)
+    noverlap = int(nperseg*(1-slide_ratio))
+
+    split1 = lchandler.lcsplit(
+        X1, dt, min_points=nperseg, min_gap=dt
+    )
+    split2 = lchandler.lcsplit(
+        X2, dt, min_points=nperseg, min_gap=dt
+    )
+    corrs = []
+    for x1, x2 in zip(split1, split2):
+
+        divided_curve1 = lchandler.divide_into_segment(
+            x1.T, nperseg, noverlap
+        )
+        divided_curve2 = lchandler.divide_into_segment(
+            x2.T, nperseg, noverlap
+        )
+
+        xs1 = divided_curve1[1, :, :]
+        xs2 = divided_curve2[1, :, :]
+        for a, b in zip(xs1, xs2):
+
+            a = (a - np.mean(a)) / np.std(a)
+            b = (b - np.mean(b)) / np.std(b)
+            a = a * np.hanning(len(a))
+            b = b * np.hanning(len(b))
+            lags, corr = ccf(
+                a, b,
+                fs=1/dt, maxlags=maxlags
+            )
+            corrs.append(corr)
+    corrs = np.array(corrs)
+
+    return lags, corrs
 
 
 def ccf(x, y, fs=1, maxlags=None):

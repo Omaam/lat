@@ -7,6 +7,24 @@ import numpy as np
 import pandas as pd
 
 
+def load_qdpfile(qdp_file, columns=None):
+
+    # Reshape df for qdp in proper one.
+    df = pd.read_table(qdp_file, skiprows=3, header=None, sep=" ")
+    idx_change_point = np.where(df.iloc[:, 0] == "NO")[0][0]
+    df1 = df.iloc[:idx_change_point].reset_index(drop=True)
+    df2 = df.iloc[idx_change_point+1:].reset_index(drop=True)
+    df_tot = pd.merge(df1, df2, on=[0, 1])
+    colnum_all_no = np.where(df_tot.iloc[0] == "NO")[0]
+    df_tot = df_tot.drop(columns=df_tot.columns[colnum_all_no])
+    df_tot = df_tot.astype(float)
+
+    if columns is not None:
+        df_tot.columns = columns
+
+    return df_tot
+
+
 def load_eventfile(event_name):
     """Input event file and output dataframe.
     """
@@ -22,19 +40,21 @@ def load_lcfile(lcname):
     return df_lc
 
 
-def load_qdpfile(qdp_name, columns=None):
+class QDP:
 
-    # Reshape df for qdp in proper one.
-    df = pd.read_table(qdp_name, skiprows=3, header=None, sep=" ")
-    idx_change_point = np.where(df.iloc[:, 0] == "NO")[0][0]
-    df1 = df.iloc[:idx_change_point].reset_index(drop=True)
-    df2 = df.iloc[idx_change_point+1:].reset_index(drop=True)
-    df_tot = pd.merge(df1, df2, on=[0, 1])
-    colnum_all_no = np.where(df_tot.iloc[0] == "NO")[0]
-    df_tot = df_tot.drop(columns=df_tot.columns[colnum_all_no])
-    df_tot = df_tot.astype(float)
+    def __init__(self, qdp_file: str, colnames: list = None):
+        self.df_qdp = load_qdpfile(qdp_file, colnames)
 
-    if columns is not None:
-        df_tot.columns = columns
+    def request_flux(self, energies: list,
+                     target_colname: str):
 
-    return df_tot
+        df_qdp = self.df_qdp
+
+        ids = np.searchsorted(df_qdp["ENERGY"], energies)
+        fluxes = df_qdp[target_colname].iloc[ids]
+
+        return fluxes
+
+    @property
+    def qdp(self):
+        return self.df_qdp

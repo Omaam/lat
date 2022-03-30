@@ -70,6 +70,8 @@ def _sample_ouprocess(num_sample: int,
     # Make random_state be int or None.
     if np.isnan(random_state):
         random_state = None
+    elif isinstance(random_state, float):
+        random_state = int(random_state)
 
     np.random.seed(random_state)
     y = np.random.multivariate_normal(mean, cov)

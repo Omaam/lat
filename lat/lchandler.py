@@ -17,6 +17,7 @@ def divide_into_segment(x, nperseg, noverlap):
 def lcsplit(lcdata, dt, min_points=1, min_gap=None):
     """
     """
+    lcdata = np.array(lcdata)
 
     if min_gap is None:
         min_gap = dt
