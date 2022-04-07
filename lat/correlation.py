@@ -79,6 +79,10 @@ def calc_stackccf(
         xs1 = divided_curve1[1, :, :]
         xs2 = divided_curve2[1, :, :]
         for a, b in zip(xs1, xs2):
+            if np.all(a == 0):
+                break
+            if np.all(b == 0):
+                break
 
             a = (a - np.mean(a)) / np.std(a)
             b = (b - np.mean(b)) / np.std(b)
