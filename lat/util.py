@@ -17,10 +17,7 @@ def calc_energy_centers_and_errors(energy_edges):
     energy_edges = np.array(energy_edges)
 
     energy_centers = (energy_edges[1:] + energy_edges[:-1]) / 2
-    energy_errors_upper = energy_edges[1:] - energy_centers
-    energy_errors_lower = energy_centers - energy_edges[:-1]
-    energy_errors = np.vstack(
-        [energy_errors_lower, energy_errors_upper])
+    energy_errors = energy_edges[1:] - energy_centers
 
     return energy_centers, energy_errors
 
