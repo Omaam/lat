@@ -3,7 +3,9 @@
 This module handles fits and qdp files.
 """
 import warnings
+
 from astropy.table import Table
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -27,6 +29,9 @@ class QDP:
 
     def __init__(self, qdp_file: str, component_names: list = None):
         self.df_qdp = self._load_qdpfile(qdp_file, component_names)
+
+        # Number of columns except for the components is 7.
+        self.num_comp = len(self.df_qdp.columns) - 7
 
     def request_flux(self, energy_range: list,
                      target_colname: str):
@@ -55,8 +60,43 @@ class QDP:
         countrate = spec_within_range.sum()
         return countrate
 
-    def plot_spec(self):
-        return None
+    def plot_spec(self, xlim=None, ylim_spec=None, figsize=None):
+
+        fig, (ax0, ax1) = plt.subplots(
+            2, 1, figsize=figsize,
+            sharex=True, constrained_layout=True,
+            gridspec_kw={
+                "height_ratios": [2, 1]}
+        )
+
+        energy = self.df_qdp["energy"].values
+
+        ax0.errorbar(energy, self.df_qdp["obs"],
+                     yerr=self.df_qdp["obs_err"],
+                     drawstyle="steps-mid",
+                     linestyle="-", color="k")
+        ax0.errorbar(energy, self.df_qdp["model_total"],
+                     linestyle="--", color="k")
+
+        models = self.df_qdp.values[:, 5:5+self.num_comp].T
+        for model in models:
+            ax0.errorbar(energy, model, linestyle="--", color="k")
+
+        ax0.set_xscale("log")
+        ax0.set_ylabel("counts/s/keV")
+        # ax0.set_ylim(ylim_spec)
+        ax0.set_yscale("log")
+
+        ax1.errorbar(energy, self.df_qdp["resid"],
+                     yerr=self.df_qdp["resid_err"],
+                     fmt=".", color="k")
+        ax1.axhline(color="r", zorder=99)
+        ax1.set_xlabel("Energy (keV)")
+        # ax1.set_xlim(xlim)
+        ax1.set_xscale("log")
+        ax1.set_ylabel("(data-model)/model")
+
+        return fig
 
     @property
     def qdp(self):
