@@ -2,6 +2,7 @@
 
 This module handles fits and qdp files.
 """
+import warnings
 from astropy.table import Table
 import numpy as np
 import pandas as pd
@@ -54,8 +55,19 @@ class QDP:
         countrate = spec_within_range.sum()
         return countrate
 
+    def plot_spec(self):
+        return None
+
     @property
     def qdp(self):
+        warnings.warn(
+            "Don't use 'qdp' when getting dataframe."
+            "Insted, use values."
+        )
+        return self.df_qdp
+
+    @property
+    def values(self):
         return self.df_qdp
 
     def _create_columns_for_qdp(self, component_names: list):
@@ -78,8 +90,10 @@ class QDP:
         df_tot = df_tot.drop(columns=df_tot.columns[colnum_all_no])
         df_tot = df_tot.astype(float)
 
-        if component_names is not None:
-            df_tot.columns = self._create_columns_for_qdp(
-                component_names)
+        if component_names is None:
+            num_comp = len(df_tot.columns) - 7
+            component_names = [f"comp_{i}" for i in range(num_comp)]
+
+        df_tot.columns = self._create_columns_for_qdp(component_names)
 
         return df_tot
