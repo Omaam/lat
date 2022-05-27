@@ -24,8 +24,8 @@ def load_lcfile(lcname):
 
 class QDP:
 
-    def __init__(self, qdp_file: str, colnames: list = None):
-        self.df_qdp = self._load_qdpfile(qdp_file, colnames)
+    def __init__(self, qdp_file: str, component_names: list = None):
+        self.df_qdp = self._load_qdpfile(qdp_file, component_names)
 
     def request_flux(self, energy_range: list,
                      target_colname: str):
@@ -48,8 +48,8 @@ class QDP:
         Returns:
             countrate: Count rate.
         """
-        cond_for_range = energy_range[0] <= self.df_qdp["ENERGY"]
-        cond_for_range &= self.df_qdp["ENERGY"] < energy_range[1]
+        cond_for_range = energy_range[0] <= self.df_qdp["energy"]
+        cond_for_range &= self.df_qdp["energy"] < energy_range[1]
         spec_within_range = self.df_qdp[cond_for_range][target_colname]
         countrate = spec_within_range.sum()
         return countrate
@@ -58,7 +58,15 @@ class QDP:
     def qdp(self):
         return self.df_qdp
 
-    def _load_qdpfile(self, qdp_file, columns=None):
+    def _create_columns_for_qdp(self, component_names: list):
+        start = ["energy", "energy_err",
+                 "obs", "obs_err",
+                 "model_total"]
+        comps = list(component_names)
+        end = ["resid", "resid_err"]
+        return start + comps + end
+
+    def _load_qdpfile(self, qdp_file, component_names=None):
 
         # Reshape df for qdp in proper one.
         df = pd.read_table(qdp_file, skiprows=3, header=None, sep=" ")
@@ -70,7 +78,8 @@ class QDP:
         df_tot = df_tot.drop(columns=df_tot.columns[colnum_all_no])
         df_tot = df_tot.astype(float)
 
-        if columns is not None:
-            df_tot.columns = columns
+        if component_names is not None:
+            df_tot.columns = self._create_columns_for_qdp(
+                component_names)
 
         return df_tot
