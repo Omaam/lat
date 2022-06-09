@@ -1,3 +1,5 @@
+"""Module for handling time.
+"""
 
 
 def grego2mjd(y, m, d):
@@ -9,8 +11,9 @@ def grego2mjd(y, m, d):
     return y_term+md_term
 
 
-# Modified Julian Date -> Gregorian Calendar Date
 def mjd2grego(mjd):
+    """Modified Julian Date -> Gregorian Calendar Date
+    """
     n = mjd + 678881
     a = 4*n + 3 + 4*(3*(4*(n+1)//146097+1)//4)
     b = 5*((a % 1461)//4) + 2
