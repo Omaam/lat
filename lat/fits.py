@@ -2,9 +2,27 @@
 TODO:
     *Make Event class for event file.
 """
+from astropy.io import fits
+from astropy.table import Table
 import numpy as np
 # import pandas as pd
 # import matplotlib.pyplot as plt
+
+
+def apply_gtis(a, gtis):
+
+    # make mask
+    mask = np.zeros(a.shape)
+    for gti in gtis:
+        m = np.ones(a.shape)
+        m = np.where(((gti[0] <= a) & (a <= gti[1])), m, 0)
+        mask += m
+
+    # apply mask
+    mask = mask.astype(bool)
+    aa = a[mask]
+
+    return aa
 
 
 def make_gti(time, dt=1, min_points=1):
@@ -26,20 +44,13 @@ def make_gti(time, dt=1, min_points=1):
     return np.array(gtis)
 
 
-def apply_gtis(a, gtis):
-
-    # make mask
-    mask = np.zeros(a.shape)
+def update_gti(event_file, gtis, idx_git_hdu=2):
+    hdul = fits.open(event_file)
+    tbl = Table.read(hdul[idx_git_hdu])
     for gti in gtis:
-        m = np.ones(a.shape)
-        m = np.where(((gti[0] <= a) & (a <= gti[1])), m, 0)
-        mask += m
-
-    # apply mask
-    mask = mask.astype(bool)
-    aa = a[mask]
-
-    return aa
+        tbl.add_row(gti)
+    hdul[idx_git_hdu] = fits.BinTableHDU(tbl)
+    return hdul
 
 
 class Event():
