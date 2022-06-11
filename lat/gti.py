@@ -25,7 +25,7 @@ def apply_gtis(a, gtis):
     return aa
 
 
-def make_gti(time, dt=1, min_points=1):
+def make_gti(time, dt):
     # search for irregular interval
     diff = np.round(np.diff(time), 6)
     idxs_split = np.array(np.where(diff != dt)) + 1
@@ -38,7 +38,7 @@ def make_gti(time, dt=1, min_points=1):
     gtis = []
     for k in range(len(idxs_split)-1):
         time_chunk = time[idxs_split[k]:idxs_split[k+1]]
-        if len(time_chunk) >= min_points:
+        if len(time_chunk) > 1:
             gtis.append([time_chunk[0], time_chunk[-1]])
 
     return np.array(gtis)
