@@ -1,6 +1,4 @@
-"""
-TODO:
-    *Make Event class for event file.
+"""GTI handling functions.
 """
 from astropy.io import fits
 from astropy.table import Table
@@ -25,7 +23,27 @@ def apply_gtis(a, gtis):
     return aa
 
 
-def make_gti(time, dt):
+def calc_total_time_in_gti(gtis):
+    gtis = np.array(gtis)
+    total_time = np.sum(gtis[:, 1] - gtis[:, 0])
+    return total_time
+
+
+def calc_exposure(start, stop, gtis):
+    gtis = tidy_gti(gtis)
+    dura = 0
+    for g in gtis:
+        dura += min(stop, g[1]) - max(start, g[0])
+    return dura
+
+
+def load_gti_from_event(event_file, idx_gti_hdu=2):
+    hdul = fits.open(event_file)
+    df = Table.read(hdul[idx_gti_hdu]).to_pandas()
+    return df[["START", "STOP"]].values
+
+
+def make_gti_from_timeseries(time, dt):
     # search for irregular interval
     diff = np.round(np.diff(time), 6)
     idxs_split = np.array(np.where(diff != dt)) + 1
@@ -44,23 +62,51 @@ def make_gti(time, dt):
     return np.array(gtis)
 
 
-def update_gti(event_file, gtis, idx_git_hdu=2):
-    hdul = fits.open(event_file)
-    tbl = Table.read(hdul[idx_git_hdu])
-    for gti in gtis:
-        tbl.add_row(gti)
-    hdul[idx_git_hdu] = fits.BinTableHDU(tbl)
+def make_hdu_of_gti(hdul, gtis, idx_gti_hdu):
+    gtis = np.array(gtis)
+    tstart = fits.Column(name="START", array=gtis[:, 0], format='E')
+    tstop = fits.Column(name="STOP", array=gtis[:, 1], format='E')
+    tbl = fits.BinTableHDU.from_columns([tstart, tstop], name="GTI")
+    hdul.append(tbl)
     return hdul
 
 
-class Event():
+def tidy_gti(gtis):
+    gtis_out = []
+    for g in gtis:
+        if len(gtis_out) == 0:
+            gtis_out.append(g)
+            continue
+        for o in gtis_out:
+            if o[0] < g[0] and g[1] < o[1]:
+                gtis_out.remove(o)
+                gtis_out.append(g)
+            else:
+                if g[1] < o[0]:
+                    gtis_out.append(g)
+                elif o[0] < g[1]:
+                    o[1] = g[1]
+                elif g[0] < o[1]:
+                    o[0] = g[0]
+                elif o[1] < g[1]:
+                    gtis_out.append(g)
+    return np.array(gtis_out)
 
-    def __init__(self, event_file):
-        self.event = None
-        pass
 
-    def extract(self, condition):
-        pass
+def save_gti(gtis, savename, overwrite=False):
+    gtis = np.array(gtis)
+    tstart = fits.Column(name="START", array=gtis[:, 0], format='E')
+    tstop = fits.Column(name="STOP", array=gtis[:, 1], format='E')
+    tbl = fits.BinTableHDU.from_columns([tstart, tstop], name="GTI")
+    tbl.writeto(savename, overwrite=overwrite)
 
-    def remove(self, condition):
-        pass
+
+def update_gti(hdul, gtis, idx_gti_hdu=2):
+    if len(hdul) >= idx_gti_hdu:
+        make_hdu_of_gti(hdul, gtis, idx_gti_hdu)
+    else:
+        tbl = Table.read(hdul[idx_gti_hdu])
+        for gti in gtis:
+            tbl.add_row(gti)
+        hdul[idx_gti_hdu] = fits.BinTableHDU(tbl)
+    return hdul

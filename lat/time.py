@@ -1,5 +1,19 @@
 """Module for handling time.
 """
+import numpy as np
+import pandas as pd
+
+
+def convert_xrismtime2utc(xrism_time_sec):
+    xrism_time_start = pd.Timestamp("2014-01-01 00:00:00")
+    xrism_time_sec = pd.to_timedelta(xrism_time_sec, unit="s")
+    return xrism_time_sec + xrism_time_start
+
+
+def convert_utc2xrismtime(utc):
+    xrism_time_start = pd.Timestamp("2014-01-01 00:00:00")
+    time_in_xrismtime = utc - xrism_time_start
+    return time_in_xrismtime / np.timedelta64(1, 's')
 
 
 def grego2mjd(y, m, d):
