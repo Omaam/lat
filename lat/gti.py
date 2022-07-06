@@ -3,24 +3,19 @@
 from astropy.io import fits
 from astropy.table import Table
 import numpy as np
+from numpy.typing import ArrayLike
 # import pandas as pd
 # import matplotlib.pyplot as plt
 
 
-def apply_gtis(a, gtis):
-
-    # make mask
-    mask = np.zeros(a.shape)
+def apply_gtis(X: np.ndarray, time: ArrayLike, gtis):
+    mask = np.zeros(time.shape)
     for gti in gtis:
-        m = np.ones(a.shape)
-        m = np.where(((gti[0] <= a) & (a <= gti[1])), m, 0)
+        m = np.ones(time.shape)
+        m = np.where(((gti[0] <= time) & (time <= gti[1])), m, 0)
         mask += m
-
-    # apply mask
     mask = mask.astype(bool)
-    aa = a[mask]
-
-    return aa
+    return X[mask]
 
 
 def calc_total_time_in_gti(gtis):
@@ -64,8 +59,8 @@ def make_gti_from_timeseries(time, dt):
 
 def make_hdu_of_gti(hdul, gtis, idx_gti_hdu):
     gtis = np.array(gtis)
-    tstart = fits.Column(name="START", array=gtis[:, 0], format='E')
-    tstop = fits.Column(name="STOP", array=gtis[:, 1], format='E')
+    tstart = fits.Column(name="TSTART", array=gtis[:, 0], format='E')
+    tstop = fits.Column(name="TSTOP", array=gtis[:, 1], format='E')
     tbl = fits.BinTableHDU.from_columns([tstart, tstop], name="GTI")
     hdul.append(tbl)
     return hdul
@@ -95,8 +90,8 @@ def tidy_gti(gtis):
 
 def save_gti(gtis, savename, overwrite=False):
     gtis = np.array(gtis)
-    tstart = fits.Column(name="START", array=gtis[:, 0], format='E')
-    tstop = fits.Column(name="STOP", array=gtis[:, 1], format='E')
+    tstart = fits.Column(name="TSTART", array=gtis[:, 0], format='E')
+    tstop = fits.Column(name="TSTOP", array=gtis[:, 1], format='E')
     tbl = fits.BinTableHDU.from_columns([tstart, tstop], name="GTI")
     tbl.writeto(savename, overwrite=overwrite)
 
