@@ -38,7 +38,7 @@ class QDP:
 
         df_qdp = self.df_qdp
 
-        ids = np.searchsorted(df_qdp["ENERGY"], energy_range)
+        ids = np.searchsorted(df_qdp["energy"], energy_range)
         fluxes = df_qdp[target_colname].iloc[ids]
 
         return fluxes
