@@ -236,10 +236,11 @@ def symccf(a, base_side='left'):
     return corr_rest
 
 
-def subtract_oneside(a, base_side):
+def subtract_oneside(
+        a, which: str = "positive") -> np.ndarray:
 
     # make array
-    corr_sym = np.copy(a) if base_side == 'left' else np.copy(a[::-1])
+    corr_sym = np.copy(a) if which == 'negative' else np.copy(a[::-1])
 
     # get center index + 1
     idx_med_m2 = int(np.floor(len(corr_sym)/2)) - 1
