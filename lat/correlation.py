@@ -240,7 +240,7 @@ def subtract_oneside(
         a, which: str = "positive") -> np.ndarray:
 
     # make array
-    corr_sym = np.copy(a) if which == 'negative' else np.copy(a[::-1])
+    corr_sym = np.copy(a) if which == 'positive' else np.copy(a[::-1])
 
     # get center index + 1
     idx_med_m2 = int(np.floor(len(corr_sym)/2)) - 1
