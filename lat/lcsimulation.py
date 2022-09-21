@@ -1,14 +1,19 @@
 """Lag simulation class.
 """
 from absl import logging
-import GPy as gpy
 import numpy as np
 import pandas as pd
+import tensorflow as tf
+import tensorflow_probability as tfp
+
+tfd = tfp.distributions
+psd_kernels = tfp.math.psd_kernels
 
 
 def _add_ouprocess_to_df(num_sample_lc: int,
                          df_ou: pd.DataFrame,
-                         df_lc: pd.DataFrame):
+                         df_lc: pd.DataFrame,
+                         sample_shape: int = 1):
     """Add OU process samples to pandas.DataFrame.
     """
 
@@ -22,6 +27,7 @@ def _add_ouprocess_to_df(num_sample_lc: int,
         curve = _sample_ouprocess(num_sample_ou,
                                   ou_info.variance,
                                   ou_info.lengthscale,
+                                  sample_shape,
                                   ou_info.random_state)
         curves.append(curve)
 
@@ -31,8 +37,10 @@ def _add_ouprocess_to_df(num_sample_lc: int,
     return df_ou
 
 
-def _create_lcmatrix(num_sample_lc: int, df_ou: pd.DataFrame,
-                     df_lc: pd.DataFrame):
+def _create_lcmatrix(num_sample_lc: int,
+                     df_ou: pd.DataFrame,
+                     df_lc: pd.DataFrame,
+                     sample_shape: int = 1):
     """Create curve matrix from blueprint for light curves.
     """
 
@@ -46,7 +54,7 @@ def _create_lcmatrix(num_sample_lc: int, df_ou: pd.DataFrame,
         ou_info = df_ou.iloc[ou_id]
 
         shift = -lag + ou_info.max_lag
-        lc = ou_info.curve[shift:shift+num_sample_lc]
+        lc = ou_info.curve[shift:shift+sample_shape*num_sample_lc]
         lc_matrix.append(lc)
 
     lc_matrix = np.array(lc_matrix).T
@@ -54,29 +62,28 @@ def _create_lcmatrix(num_sample_lc: int, df_ou: pd.DataFrame,
 
 
 def _sample_ouprocess(num_sample: int,
-                      variance: float = 1,
+                      variance: float = 1.0,
                       lengthscale: float = None,
+                      sample_shape: int = 1,
                       random_state=None):
+    """Sample observation from OU process curve.
 
-    x = np.arange(0, num_sample, 1)
-    x = x[:, np.newaxis]
+    Returns:
+        samples
+    """
 
-    kernel = gpy.kern.Exponential(input_dim=1,
-                                  variance=variance,
-                                  lengthscale=lengthscale)
-    mean = np.zeros(num_sample)
-    cov = kernel.K(x, x)
-
-    # Make random_state be int or None.
-    if np.isnan(random_state):
-        random_state = None
-    elif isinstance(random_state, float):
-        random_state = int(random_state)
-
-    np.random.seed(random_state)
-    y = np.random.multivariate_normal(mean, cov)
-
-    return y
+    x = np.expand_dims(
+        np.linspace(0, num_sample, num_sample), -1)
+    kernel = psd_kernels.MaternOneHalf(
+        amplitude=np.expand_dims(float(variance), -1),
+        length_scale=np.expand_dims(float(lengthscale), -1)
+    )
+    gp = tfd.GaussianProcess(kernel, x)
+    samples = gp.sample(sample_shape, seed=int(random_state))
+    samples = tf.squeeze(samples)
+    samples = np.ravel(samples)
+    print(samples.shape)
+    return samples
 
 
 def _parse_df_lc(df_ou, df_lc):
@@ -191,7 +198,7 @@ class LCSimulation():
         self.df_lc = self.df_lc.append(lc_info, ignore_index=True)
         self.lc_counter += 1
 
-    def sample(self, num_sample_lc: int):
+    def sample(self, num_sample_lc: int, sample_shape: int = 1):
         """Sample curves using added information.
         """
         if len(self.df_lc) == 0:
@@ -200,9 +207,10 @@ class LCSimulation():
 
         self.df_ou = _add_ouprocess_to_df(num_sample_lc,
                                           self.df_ou,
-                                          self.df_lc)
+                                          self.df_lc,
+                                          sample_shape)
         lcmatrix = _create_lcmatrix(num_sample_lc, self.df_ou,
-                                    self.df_lc)
+                                    self.df_lc, sample_shape)
         self.lcmatrix = lcmatrix
 
         return lcmatrix
