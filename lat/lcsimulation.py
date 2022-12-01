@@ -30,7 +30,6 @@ def _add_ouprocess_to_df(num_sample_lc: int,
                                   sample_shape,
                                   ou_info.random_state)
         curves.append(curve)
-
     df_ou["curve"] = curves
     logging.debug("df_ou:\n%s", df_ou)
 
@@ -54,10 +53,10 @@ def _create_lcmatrix(num_sample_lc: int,
         ou_info = df_ou.iloc[ou_id]
 
         shift = -lag + ou_info.max_lag
-        lc = ou_info.curve[shift:shift+sample_shape*num_sample_lc]
+        lc = ou_info.curve[:, shift:shift+num_sample_lc]
         lc_matrix.append(lc)
 
-    lc_matrix = np.array(lc_matrix).T
+    lc_matrix = np.array(lc_matrix).transpose((1, 0, 2))
     return lc_matrix
 
 
@@ -75,14 +74,12 @@ def _sample_ouprocess(num_sample: int,
     x = np.expand_dims(
         np.linspace(0, num_sample, num_sample), -1)
     kernel = psd_kernels.MaternOneHalf(
-        amplitude=np.expand_dims(float(variance), -1),
-        length_scale=np.expand_dims(float(lengthscale), -1)
+        amplitude=tf.Variable(variance, dtype=np.float64),
+        length_scale=tf.Variable(lengthscale, dtype=np.float64),
     )
     gp = tfd.GaussianProcess(kernel, x)
     samples = gp.sample(sample_shape, seed=int(random_state))
-    samples = tf.squeeze(samples)
-    samples = np.ravel(samples)
-    print(samples.shape)
+    samples = samples.numpy()
     return samples
 
 

@@ -7,8 +7,9 @@ TODO:
 """
 from typing import List
 
+from numpy.typing import ArrayLike
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from scipy import signal
 
 from lat.basic import lcsplit
@@ -280,29 +281,12 @@ def ccf_error(x, y, fs=1.0, nperseg=256, noverlap=None,
     return lags, cc_mat
 
 
-def main():
-
-    np.random.seed(20210612)
-
-    npoints = 10000
-    lag = 5
-
-    # lightcurve creation
-    time = np.arange(npoints)
-    flux = np.random.normal(0, 1, npoints+lag)
-    lcdata1 = np.array([time, flux[lag:npoints+lag]]).T
-    lcdata2 = np.array([time, flux[0:npoints]]).T
-
-    # test
-    lags, cc_mat = ccf_error(lcdata1[:, 1], lcdata2[:, 1],
-                             nperseg=256, noverlap=128,
-                             maxlags=20)
-    cc_05, cc_50, cc_95 = np.quantile(cc_mat, [0.05, 0.50, 0.95], axis=0)
-
-    plt.plot(lags, cc_50)
-    plt.fill_between(lags, cc_05, cc_95, alpha=0.5)
-    plt.show()
-
-
-if __name__ == '__main__':
-    main()
+def calc_weighted_lag(lags: ArrayLike, correlations: ArrayLike,
+                      ignore_negative_correlation=False) -> float:
+    if ignore_negative_correlation:
+        ids_target = np.where(correlations >= 0)
+        lags = lags[ids_target]
+        correlations = correlations[ids_target]
+    weights = correlations / np.sum(correlations)
+    weighted_lag = np.average(lags, weights=weights)
+    return weighted_lag

@@ -17,7 +17,11 @@ def set_module(module):
 
 
 def lcsplit(lcdata, dt, min_points=1, min_gap=None):
-    """
+    """Generated splitted light curves.
+
+    Yields:
+        np.ndarray: splitted light curves, which shape is not
+        the same each other.
     """
 
     if min_gap is None:
@@ -40,5 +44,5 @@ def lcsplit(lcdata, dt, min_points=1, min_gap=None):
             yield lcdata[idxs_split[k]:idxs_split[k+1]]
 
 
-def moving_average(a, n_ave):
-    return np.convolve(a, np.ones(n_ave), 'valid') / n_ave
+def moving_average(a, width):
+    return np.convolve(a, np.ones(width), 'valid') / width
