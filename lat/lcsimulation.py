@@ -162,7 +162,9 @@ class LCSimulation():
             "lengthscale": lengthscale,
             "random_state": random_state
         }
-        self.df_ou = self.df_ou.append(ou_info, ignore_index=True)
+        self.df_ou = pd.concat([self.df_ou,
+                                pd.DataFrame(ou_info, index=[0])],
+                               ignore_index=True)
 
     def add_error_gaussian(self, target_lc_indices: list,
                            mean: float = 0.0, variance: float = 0.1):
