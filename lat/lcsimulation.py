@@ -194,7 +194,9 @@ class LCSimulation():
         lc_info = {"lc_id": self.lc_counter,
                    "ou_id": ou_id,
                    "lag":   lag}
-        self.df_lc = self.df_lc.append(lc_info, ignore_index=True)
+        self.df_lc = pd.concat([self.df_lc,
+                                pd.DataFrame(lc_info, index=[0])],
+                               ignore_index=True)
         self.lc_counter += 1
 
     def sample(self, num_sample_lc: int, sample_shape: int = 1):
