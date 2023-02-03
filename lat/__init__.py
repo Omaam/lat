@@ -4,7 +4,6 @@
 from lat.io import *
 
 from lat.basic import *
-from lat.convert import *
 from lat.correlation import *
 from lat.gti import *
 from lat.io import *
